@@ -1,0 +1,49 @@
+Structuri utilizate:
+
+    Pentru thread-urile de mapper am folosit structura dataMapperi care contine campurile:
+        - *un_s -> pointer la un set care retine numerele deja procesate, pentru a nu mai 
+        verifica din nou acelasi numar, deoarece stim deja ca ce puteri perfecte se scrie
+        - nrMapperi -> numarul de mapperi 
+        - nrReduceri -> numarul de reducers
+        - numOfFiles numarul de fisiere din care se citeste
+        - *fileNumber -> pointer catre un numar ce specifica indexul urmatorului fisier
+        ce trebui sa fie citit de catre mapperi
+        - path -> calea de la care se citeste
+        - fiesToRead -> fvector cu isierele din care se citeste
+        - *perfectPowers vector catre un vector<vector<vector<int>>> ce reprezinta lista de
+        puteri perfecte a fiecarui thread mapper. perfectPowers[i][j][k] reprezinta al k-lea
+        element din lista de puterilor perfecte de exponent j a thread-ului cu id i
+        - id -> id-ul thread-ului
+
+    Pentru thread-urile de reducer am folosit structura dataReducers care contine campurile:
+        - *perfectPowers -> pointer catre acelasi vector<vector<vector<int>>> catre care
+        pointeaza si cel din dataMapperi
+        - nrMapperi -> numarul de mapperi
+        - nrReduceri -> nr de reducers
+        - id -> id-ul thread-ului de reducer
+        - *un_s pointer catre acelasi set catre care pointeaza si cel din dataMapperi
+
+Modul de rezolvare:
+    Se pornesc toate thread-urile. Am utilizat o bariera cu parametrul egal cu 
+nrMappers + nrReducers pentru a face thread-urile de reducers sa porneascac dupa ce 
+toate cele de mappers.
+     Pentru thread-urile de tip mapper am folosit 2 mutexi: unul pentru citire si unul 
+pentru adaugarea elementelor in set-ul de numere verificate (mutexCitire si mutexAdd).
+Mutexul de citire il folosesc atunci cand verific ca indexul fisierului din care
+urmeaza sa citesc este mai mic decat numarul de fisiere si pentru incrementarea
+acestui index, deoarece ar aparea un race condition. MutexAdd este mutex-ul pe care il 
+folosesc atunci cand vreau sa adaug un element in set-ul comun tuturor, deoarece apare din
+nou un race condition.
+    Fisierele sunt atribuite dinamic, fiecare thread citeste atunci cand este liber/ disponibil.
+Se citeste element cu element. Daca numarul citit este deja in set, se sare peste, iar daca nu
+este in set deja, se adauga si se verifica cum poate fii scris ca puteri perfecte. Daca am citit
+numarul 1, atunci il adaug in lista tuturor exponentilor thread-ului respectiv, iar daca nu este 1,
+pentru fiecare exponent exp caut binar baza b astfel incat b^exp = numarul citit. Pentru adaugarea
+elementelor in lista exponentului nu este nevoie de un mutex, deoarece fiecare thread il adauga
+elemente doar la lista id-ului lui.
+    Pentru thread-urile de reducers, thread-ul cu id-ul id calculeaza cate numere unice din listele
+obtinute de mapperi se pot scrie ca putere perfecta cu exponentul id. Asadar este suficient sa ma
+uit in listele tuturor thread-urilor obtinute mapper doar la elementele listelor exponentului id.
+Pentru ca am verificat cu ajutorul set-ului sa nu procesez un numar de mai multe ori, toate listele
+obtinute de mapperi au valori dinstincte, deci este suficent sa fac suma lungimilor listelor cu 
+exponentul id ale tuturor listelor obtinute de mappers, apoi scriu valoarea in fisier.
